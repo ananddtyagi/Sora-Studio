@@ -123,11 +123,10 @@ function VideoHistoryContent() {
             {video.prompt || `Video ${video.id}`}
           </p>
           <div className="flex items-center gap-2 flex-wrap mb-3">
-            <span className={`text-xs px-2 py-0.5 rounded ${
-              video.status === 'completed' ? 'bg-green-100 text-green-700' :
-              video.status === 'failed' ? 'bg-red-100 text-red-700' :
-              'bg-yellow-100 text-yellow-700'
-            }`}>
+            <span className={`text-xs px-2 py-0.5 rounded ${video.status === 'completed' ? 'bg-green-100 text-green-700' :
+                video.status === 'failed' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+              }`}>
               {video.status}
             </span>
             <span className="text-xs text-gray-500">
@@ -332,11 +331,10 @@ export default function Home() {
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setLeftPanelTab('videos')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                leftPanelTab === 'videos'
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${leftPanelTab === 'videos'
                   ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -347,11 +345,10 @@ export default function Home() {
             </button>
             <button
               onClick={() => setLeftPanelTab('chats')}
-              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                leftPanelTab === 'chats'
+              className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${leftPanelTab === 'chats'
                   ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -418,7 +415,7 @@ export default function Home() {
           <p className="text-sm text-gray-600">
             Built by{' '}
             <a
-              href="https://github.com/ananddtyagi"
+              href="https://x.com/ananddtyagi"
               target="_blank"
               rel="noopener noreferrer"
               className="text-teal-600 hover:text-teal-700 underline font-medium"
