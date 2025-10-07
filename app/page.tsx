@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 
 // Video History Content Component
 function VideoHistoryContent() {
-  const { apiKey, savedVideos, loadConversation } = useAppStore();
+  const { apiKey, savedVideos, loadConversation, referenceVideoForRemix } = useAppStore();
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +51,8 @@ function VideoHistoryContent() {
     }
   };
 
+  const getSavedVideo = (videoId: string) => savedVideos.find(v => v.videoId === videoId);
+
   const handleVideoClick = (videoId: string) => {
     fetch(`/api/videos/download/${videoId}`, {
       headers: { 'x-api-key': apiKey || '' }
@@ -67,14 +69,20 @@ function VideoHistoryContent() {
   };
 
   const handleLoadChat = (videoId: string) => {
-    const savedVideo = savedVideos.find(v => v.videoId === videoId);
+    const savedVideo = getSavedVideo(videoId);
     if (savedVideo?.conversationId) {
       loadConversation(savedVideo.conversationId);
     }
   };
 
   const getConversationId = (videoId: string) => {
-    return savedVideos.find(v => v.videoId === videoId)?.conversationId;
+    return getSavedVideo(videoId)?.conversationId;
+  };
+
+  const handleReferenceVideo = (video: any) => {
+    const savedVideo = getSavedVideo(video.id);
+    const title = savedVideo?.title || video.prompt || `Video ${video.id}`;
+    referenceVideoForRemix(video.id, title);
   };
 
   if (loading) {
@@ -114,14 +122,25 @@ function VideoHistoryContent() {
 
   return (
     <div className="p-4 space-y-3">
-      {videos.map((video) => (
-        <div
-          key={video.id}
-          className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
-        >
-          <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-2">
-            {video.prompt || `Video ${video.id}`}
+      {videos.map((video) => {
+        const savedMeta = getSavedVideo(video.id);
+        const displayTitle = savedMeta?.title || video.prompt || `Video ${video.id}`;
+        const remixedFromId = savedMeta?.remixedFromVideoId;
+        const remixedFromTitle = remixedFromId
+          ? getSavedVideo(remixedFromId)?.title || `Video ${remixedFromId}`
+          : null;
+
+        return (
+          <div
+            key={video.id}
+            className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+          >
+          <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+            {displayTitle}
           </p>
+          {remixedFromTitle && (
+            <p className="text-xs text-purple-600 mb-1">Remix of {remixedFromTitle}</p>
+          )}
           <div className="flex items-center gap-2 flex-wrap mb-3">
             <span className={`text-xs px-2 py-0.5 rounded ${video.status === 'completed' ? 'bg-green-100 text-green-700' :
                 video.status === 'failed' ? 'bg-red-100 text-red-700' :
@@ -144,6 +163,12 @@ function VideoHistoryContent() {
                 </button>
               )}
               <button
+                onClick={() => handleReferenceVideo(video)}
+                className="flex-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors"
+              >
+                Reference
+              </button>
+              <button
                 onClick={() => handleVideoClick(video.id)}
                 className="flex-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors"
               >
@@ -152,7 +177,8 @@ function VideoHistoryContent() {
             </div>
           )}
         </div>
-      ))}
+      );
+      })}
     </div>
   );
 }

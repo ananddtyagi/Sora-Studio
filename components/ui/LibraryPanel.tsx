@@ -14,7 +14,7 @@ interface VideoItem {
 }
 
 export function LibraryPanel() {
-  const { showLibrary, setShowLibrary, apiKey } = useAppStore();
+  const { showLibrary, setShowLibrary, apiKey, savedVideos, referenceVideoForRemix } = useAppStore();
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +79,15 @@ export function LibraryPanel() {
     }
   };
 
+  const getSavedVideo = (videoId: string) => savedVideos.find((video) => video.videoId === videoId);
+
+  const handleReference = (video: VideoItem) => {
+    const savedVideo = getSavedVideo(video.id);
+    const title = savedVideo?.title || video.prompt || `Video ${video.id}`;
+    referenceVideoForRemix(video.id, title);
+    setShowLibrary(false);
+  };
+
   return (
     <Modal
       isOpen={showLibrary}
@@ -120,12 +129,20 @@ export function LibraryPanel() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
-            {videos.map((video) => (
-              <div
-                key={video.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 transition-colors cursor-pointer"
-                onClick={() => setSelectedVideo(video)}
-              >
+            {videos.map((video) => {
+              const savedMeta = getSavedVideo(video.id);
+              const displayTitle = savedMeta?.title || video.prompt || `Video ${video.id}`;
+              const remixedFromId = savedMeta?.remixedFromVideoId;
+              const remixedFromTitle = remixedFromId
+                ? getSavedVideo(remixedFromId)?.title || `Video ${remixedFromId}`
+                : null;
+
+              return (
+                <div
+                  key={video.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-teal-300 transition-colors cursor-pointer"
+                  onClick={() => setSelectedVideo(video)}
+                >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -140,9 +157,15 @@ export function LibraryPanel() {
                         <span className="text-xs text-gray-500">{video.model}</span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm font-semibold text-gray-900 line-clamp-2">
+                      {displayTitle}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
                       {formatDate(video.created_at)}
                     </p>
+                    {remixedFromTitle && (
+                      <p className="text-xs text-purple-600 mt-1">Remix of {remixedFromTitle}</p>
+                    )}
                   </div>
                 </div>
 
@@ -154,6 +177,15 @@ export function LibraryPanel() {
 
                 {video.status === 'completed' && (
                   <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReference(video);
+                      }}
+                      className="flex-1 px-3 py-2 bg-purple-100 text-purple-700 text-sm rounded hover:bg-purple-200"
+                    >
+                      Reference
+                    </button>
                     <a
                       href={getVideoUrl(video.id)}
                       download
@@ -174,7 +206,8 @@ export function LibraryPanel() {
                   </div>
                 )}
               </div>
-            ))}
+            );
+            }))}
           </div>
         )}
       </div>

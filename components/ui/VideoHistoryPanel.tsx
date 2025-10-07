@@ -14,7 +14,7 @@ interface OpenAIVideo {
 }
 
 export function VideoHistoryPanel() {
-  const { showVideoHistory, setShowVideoHistory, apiKey, savedVideos, loadConversation } = useAppStore();
+  const { showVideoHistory, setShowVideoHistory, apiKey, savedVideos, loadConversation, referenceVideoForRemix } = useAppStore();
   const [videos, setVideos] = useState<OpenAIVideo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +68,10 @@ export function VideoHistoryPanel() {
       .catch(err => console.error('Failed to download video:', err));
   };
 
+  const getSavedVideo = (videoId: string) => savedVideos.find(v => v.videoId === videoId);
+
   const handleLoadChat = (videoId: string) => {
-    // Find the saved video entry to get conversationId
-    const savedVideo = savedVideos.find(v => v.videoId === videoId);
+    const savedVideo = getSavedVideo(videoId);
     if (savedVideo?.conversationId) {
       loadConversation(savedVideo.conversationId);
       setShowVideoHistory(false);
@@ -79,7 +80,14 @@ export function VideoHistoryPanel() {
 
   // Helper to get conversationId for a video
   const getConversationId = (videoId: string) => {
-    return savedVideos.find(v => v.videoId === videoId)?.conversationId;
+    return getSavedVideo(videoId)?.conversationId;
+  };
+
+  const handleReference = (video: OpenAIVideo) => {
+    const savedVideo = getSavedVideo(video.id);
+    const title = savedVideo?.title || video.prompt || `Video ${video.id}`;
+    referenceVideoForRemix(video.id, title);
+    setShowVideoHistory(false);
   };
 
   if (!showVideoHistory) return null;
@@ -151,9 +159,18 @@ export function VideoHistoryPanel() {
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-2 mb-2">
-                        {video.prompt || `Video ${video.id}`}
+                      <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                        {getSavedVideo(video.id)?.title || video.prompt || `Video ${video.id}`}
                       </p>
+                      {(() => {
+                        const remixedFromId = getSavedVideo(video.id)?.remixedFromVideoId;
+                        const remixedFromTitle = remixedFromId
+                          ? getSavedVideo(remixedFromId)?.title || `Video ${remixedFromId}`
+                          : null;
+                        return remixedFromTitle ? (
+                          <p className="text-xs text-purple-600 mb-1">Remix of {remixedFromTitle}</p>
+                        ) : null;
+                      })()}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-xs px-2 py-0.5 rounded ${video.status === 'completed'
                             ? 'bg-green-100 text-green-700'
@@ -184,23 +201,32 @@ export function VideoHistoryPanel() {
                   </div>
 
                   {/* Action Buttons */}
-                  {video.status === 'completed' && (
-                    <div className="mt-3 flex gap-2">
-                      {getConversationId(video.id) && (
-                        <button
-                          onClick={() => handleLoadChat(video.id)}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                          Chat
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleVideoClick(video.id)}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
-                      >
+                      {video.status === 'completed' && (
+                        <div className="mt-3 flex gap-2">
+                          {getConversationId(video.id) && (
+                            <button
+                              onClick={() => handleLoadChat(video.id)}
+                              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              </svg>
+                              Chat
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleReference(video)}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Reference
+                          </button>
+                          <button
+                            onClick={() => handleVideoClick(video.id)}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+                          >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
