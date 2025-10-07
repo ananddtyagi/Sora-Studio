@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useAppStore } from '@/store/useAppStore';
+import { useAppStore, SavedVideo } from '@/store/useAppStore';
 import { apiCall } from './api';
 import { cropImageFromCenter } from './imageCrop';
 
@@ -28,12 +28,6 @@ export function useVideoGeneration() {
     try {
       resetVideoGeneration();
       updateVideoGeneration({ status: 'queued', progress: 0 });
-
-      // Add info message to indicate video generation has started
-      addChatMessage({
-        role: 'info',
-        content: 'Video generation started',
-      });
 
       // Crop base image if provided
       let croppedImageBase64: string | null = null;
@@ -70,6 +64,21 @@ export function useVideoGeneration() {
       }
 
       const videoId = createData.id;
+      const initialStatus = (createData.status || 'queued') as SavedVideo['status'];
+
+      // Add info message with the video ID so the chat is linked immediately
+      addChatMessage({
+        role: 'info',
+        content: 'Video generation started',
+        videoId,
+      });
+
+      // Persist the conversation so the message survives refreshes
+      saveCurrentConversation();
+
+      // Persist the video link to this conversation right away
+      saveVideo(videoId, prompts, initialStatus);
+
       updateVideoGeneration({
         id: videoId,
         status: createData.status,
@@ -91,10 +100,14 @@ export function useVideoGeneration() {
             throw new Error(statusData.error || 'Failed to get video status');
           }
 
+          const currentStatus = statusData.status as SavedVideo['status'];
           updateVideoGeneration({
             status: statusData.status,
             progress: statusData.progress,
           });
+
+          // Keep the saved video record in sync with the latest status
+          saveVideo(videoId, prompts, currentStatus);
 
           if (statusData.status === 'completed') {
             clearInterval(pollInterval);
@@ -110,8 +123,6 @@ export function useVideoGeneration() {
             });
             // Save conversation with the info message to ensure we have a conversationId
             saveCurrentConversation();
-            // Save video to history (will be linked to current conversation)
-            saveVideo(videoId, prompts);
           } else if (statusData.status === 'failed') {
             clearInterval(pollInterval);
             updateVideoGeneration({
