@@ -32,6 +32,7 @@ export interface SavedVideo {
   prompt: string;
   createdAt: number;
   model: string;
+  status: 'queued' | 'in_progress' | 'completed' | 'failed';
 }
 
 export interface VideoConfig {
@@ -83,7 +84,7 @@ interface AppState {
   saveCurrentConversation: () => void;
   loadConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
-  saveVideo: (videoId: string, prompt: string) => void;
+  saveVideo: (videoId: string, prompt?: string, status?: SavedVideo['status']) => void;
   newConversation: () => void;
 }
 
@@ -244,18 +245,43 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  saveVideo: (videoId, prompt) => {
+  saveVideo: (videoId, prompt, status = 'queued') => {
     const state = get();
-    const video: SavedVideo = {
-      id: `vid-${Date.now()}`,
-      videoId,
-      conversationId: state.currentConversationId || `conv-${Date.now()}`,
-      prompt,
-      createdAt: Date.now(),
-      model: state.selectedModel,
-    };
 
-    const updatedVideos = [video, ...state.savedVideos];
+    if (!state.currentConversationId) {
+      state.saveCurrentConversation();
+    }
+
+    const latestState = get();
+    const conversationId = latestState.currentConversationId || `conv-${Date.now()}`;
+    const existingIndex = latestState.savedVideos.findIndex((video) => video.videoId === videoId);
+
+    let updatedVideos: SavedVideo[];
+
+    if (existingIndex >= 0) {
+      const existingVideo = latestState.savedVideos[existingIndex];
+      const updatedVideo: SavedVideo = {
+        ...existingVideo,
+        prompt: typeof prompt === 'string' && prompt.length > 0 ? prompt : existingVideo.prompt,
+        status,
+        model: latestState.selectedModel,
+        conversationId,
+      };
+      updatedVideos = [...latestState.savedVideos];
+      updatedVideos[existingIndex] = updatedVideo;
+    } else {
+      const video: SavedVideo = {
+        id: `vid-${Date.now()}`,
+        videoId,
+        conversationId,
+        prompt: prompt || '',
+        createdAt: Date.now(),
+        model: latestState.selectedModel,
+        status,
+      };
+      updatedVideos = [video, ...latestState.savedVideos];
+    }
+
     localStorage.setItem('saved_videos', JSON.stringify(updatedVideos));
 
     set({ savedVideos: updatedVideos });
@@ -315,7 +341,14 @@ if (typeof window !== 'undefined') {
   const storedVideos = localStorage.getItem('saved_videos');
   if (storedVideos) {
     try {
-      useAppStore.setState({ savedVideos: JSON.parse(storedVideos) });
+      const parsedVideos = JSON.parse(storedVideos);
+      const normalizedVideos = Array.isArray(parsedVideos)
+        ? parsedVideos.map((video: any) => ({
+            ...video,
+            status: video?.status || 'completed',
+          }))
+        : [];
+      useAppStore.setState({ savedVideos: normalizedVideos });
     } catch (e) {
       console.error('Failed to parse saved videos');
     }
