@@ -3,10 +3,10 @@ import OpenAI from 'openai';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
-    const { videoId } = params;
+    const { videoId } = await params;
     const { prompt, model, size, seconds } = await request.json();
     const apiKey = request.headers.get('x-api-key');
 
@@ -33,13 +33,8 @@ export async function POST(
 
     const openai = new OpenAI({ apiKey });
 
-    const remixOptions: Record<string, any> = { prompt };
-
-    if (model) remixOptions.model = model;
-    if (size) remixOptions.size = size;
-    if (seconds) remixOptions.seconds = seconds;
-
-    const video = await openai.videos.remix(videoId, remixOptions);
+    // Remix API only accepts prompt parameter
+    const video = await openai.videos.remix(videoId, { prompt });
 
     return NextResponse.json({
       id: video.id,

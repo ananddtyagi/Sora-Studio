@@ -23,6 +23,7 @@
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
     "jszip": "^3.10.1",
+    "lucide-react": "^0.545.0",
     "next": "^15.5.4",
     "openai": "^6.2.0",
     "postcss": "^8.5.6",

@@ -9,7 +9,8 @@ import { LibraryPanel } from '@/components/ui/LibraryPanel';
 import { SettingsPanel } from '@/components/ui/SettingsPanel';
 import { useVideoGeneration } from '@/lib/useVideoGeneration';
 import { useAppStore } from '@/store/useAppStore';
-import { useEffect, useState } from 'react';
+import { Check, DownloadCloud } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 // Video History Content Component
 function VideoHistoryContent() {
@@ -17,6 +18,8 @@ function VideoHistoryContent() {
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justDownloaded, setJustDownloaded] = useState<Record<string, boolean>>({});
+  const downloadTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     if (apiKey) {
@@ -42,8 +45,16 @@ function VideoHistoryContent() {
         throw new Error('Failed to fetch videos');
       }
 
-      const data = await response.json();
-      setVideos(data.videos || []);
+      const data = await response.json().then(data => {
+        const currentTime = Math.floor(Date.now() / 1000);
+        const videosWithExpiry = (data.videos || []).map((video: any) => ({
+          ...video,
+          expired: video.expires_at ? video.expires_at < currentTime : false,
+        }));
+        console.log('🔴 videosWithExpiry', videosWithExpiry);
+        setVideos(videosWithExpiry);
+      });
+      // setVideos(data.videos || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load videos');
     } finally {
@@ -51,9 +62,23 @@ function VideoHistoryContent() {
     }
   };
 
+
   const getSavedVideo = (videoId: string) => savedVideos.find(v => v.videoId === videoId);
 
   const handleVideoClick = (videoId: string) => {
+    // Immediate visual feedback
+    setJustDownloaded(prev => ({ ...prev, [videoId]: true }));
+    if (downloadTimersRef.current[videoId]) {
+      clearTimeout(downloadTimersRef.current[videoId]);
+    }
+    downloadTimersRef.current[videoId] = setTimeout(() => {
+      setJustDownloaded(prev => {
+        const { [videoId]: _omit, ...rest } = prev;
+        return rest;
+      });
+      delete downloadTimersRef.current[videoId];
+    }, 2000);
+
     fetch(`/api/videos/download/${videoId}`, {
       headers: { 'x-api-key': apiKey || '' }
     })
@@ -135,49 +160,72 @@ function VideoHistoryContent() {
             key={video.id}
             className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
           >
-          <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
-            {displayTitle}
-          </p>
-          {remixedFromTitle && (
-            <p className="text-xs text-purple-600 mb-1">Remix of {remixedFromTitle}</p>
-          )}
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <span className={`text-xs px-2 py-0.5 rounded ${video.status === 'completed' ? 'bg-green-100 text-green-700' :
-                video.status === 'failed' ? 'bg-red-100 text-red-700' :
-                  'bg-yellow-100 text-yellow-700'
-              }`}>
-              {video.status}
-            </span>
-            <span className="text-xs text-gray-500">
-              {new Date(video.created_at * 1000).toLocaleDateString()}
-            </span>
-          </div>
-          {video.status === 'completed' && (
-            <div className="flex gap-2">
-              {getConversationId(video.id) && (
+            <p className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+              {displayTitle}
+            </p>
+            {remixedFromTitle && (
+              <p className="text-xs text-purple-600 mb-1">Remix of {remixedFromTitle}</p>
+            )}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs px-2 py-0.5 rounded ${video.status === 'completed' ? 'bg-green-100 text-green-700' :
+                  video.status === 'failed' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                  {video.status}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {new Date(video.created_at * 1000).toLocaleDateString()}
+                </span>
+              </div>
+              {video.status === 'completed' && !video.expired && (
                 <button
-                  onClick={() => handleLoadChat(video.id)}
-                  className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-medium hover:bg-gray-200 transition-colors"
+                  onClick={() => handleVideoClick(video.id)}
+                  className="p-1.5 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded transition-colors"
+                  title={justDownloaded[video.id] ? 'Downloaded' : 'Download'}
                 >
-                  Chat
+                  {justDownloaded[video.id] ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <DownloadCloud className="w-5 h-5" />
+                  )}
                 </button>
               )}
-              <button
-                onClick={() => handleReferenceVideo(video)}
-                className="flex-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors"
-              >
-                Reference
-              </button>
-              <button
-                onClick={() => handleVideoClick(video.id)}
-                className="flex-1 px-3 py-1.5 bg-teal-600 text-white rounded text-xs font-medium hover:bg-teal-700 transition-colors"
-              >
-                Download
-              </button>
             </div>
-          )}
-        </div>
-      );
+            {video.status === 'completed' && (
+              <div className="flex gap-2">
+                {getConversationId(video.id) && (
+                  <button
+                    onClick={() => handleLoadChat(video.id)}
+                    className="flex-1 px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    Chat
+                  </button>
+                )}
+                {video.expired && (
+                  <button
+                    disabled
+                    className="flex-1 px-3 py-1.5 bg-gray-300 text-gray-500 rounded text-xs font-medium cursor-not-allowed hover:bg-gray-200 transition-colors"
+                  >
+                    Expired
+                  </button>
+                )}
+                {!video.expired && (
+                  <>
+                    {video.status === 'completed' && (
+                      <button
+                        onClick={() => handleReferenceVideo(video)}
+                        className="flex-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors"
+                      >
+                        Reference
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
       })}
     </div>
   );
@@ -249,6 +297,8 @@ function ChatHistoryContent() {
 
 export default function Home() {
   const {
+    apiKey,
+    chatMessages,
     setApiKey,
     videoGeneration,
     readyToGenerate,
@@ -260,6 +310,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [leftPanelTab, setLeftPanelTab] = useState<'videos' | 'chats'>('videos');
   const { generateVideo } = useVideoGeneration();
+  const [isGenerateButtonLocked, setIsGenerateButtonLocked] = useState(false);
 
   useEffect(() => {
     // Show API key modal only if there's no stored key
@@ -269,13 +320,44 @@ export default function Home() {
     }
   }, []); // Run only once on mount
 
-  const handleGenerateVideo = () => {
-    // Prevent double clicking while generation is queued or in progress
-    if (videoGeneration.status === 'queued' || videoGeneration.status === 'in_progress') {
+  useEffect(() => {
+    if (!isGenerateButtonLocked) return;
+    if (
+      videoGeneration.status === 'queued' ||
+      videoGeneration.status === 'in_progress' ||
+      videoGeneration.status === 'failed'
+    ) {
+      setIsGenerateButtonLocked(false);
+    }
+  }, [isGenerateButtonLocked, videoGeneration.status]);
+
+  const handleGenerateVideo = async () => {
+    // Prevent double clicking while generation is queued/in progress or already locked this click
+    if (
+      isGenerateButtonLocked ||
+      videoGeneration.status === 'queued' ||
+      videoGeneration.status === 'in_progress'
+    ) {
       return;
     }
-    generateVideo();
+
+    // Quick prechecks to avoid locking when we know we won't start
+    if (!apiKey) {
+      alert('Please set your OpenAI API key in settings');
+      return;
+    }
+    const hasUserPrompt = chatMessages.some(
+      (m) => m.role === 'user' && m.content.trim().length > 0
+    );
+    if (!hasUserPrompt) {
+      alert('Please describe your video idea in the chat');
+      return;
+    }
+
+    setIsGenerateButtonLocked(true); // disable immediately to prevent double click
     setReadyToGenerate(false); // Reset the highlight after clicking
+    // Fire off generation (status will move to queued/in_progress soon after)
+    generateVideo();
   };
 
   return (
@@ -358,8 +440,8 @@ export default function Home() {
             <button
               onClick={() => setLeftPanelTab('videos')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${leftPanelTab === 'videos'
-                  ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -372,8 +454,8 @@ export default function Home() {
             <button
               onClick={() => setLeftPanelTab('chats')}
               className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${leftPanelTab === 'chats'
-                  ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -400,7 +482,11 @@ export default function Home() {
           <div className="p-6 border-t border-gray-200">
             <Button
               onClick={handleGenerateVideo}
-              disabled={videoGeneration.status === 'in_progress' || videoGeneration.status === 'queued'}
+              disabled={
+                isGenerateButtonLocked ||
+                videoGeneration.status === 'in_progress' ||
+                videoGeneration.status === 'queued'
+              }
               className={`w-full transition-all ${readyToGenerate ? 'animate-pulse ring-4 ring-teal-300 shadow-lg scale-105' : ''}`}
               size="lg"
             >
