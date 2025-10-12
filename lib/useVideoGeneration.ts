@@ -4,7 +4,19 @@ import { apiCall } from './api';
 import { cropImageFromCenter } from './imageCrop';
 
 export function useVideoGeneration() {
-  const { apiKey, chatMessages, selectedModel, baseImage, videoConfig, updateVideoGeneration, resetVideoGeneration, saveVideo, addChatMessage, saveCurrentConversation } = useAppStore();
+  const {
+    apiKey,
+    chatMessages,
+    selectedModel,
+    baseImage,
+    videoConfig,
+    updateVideoGeneration,
+    resetVideoGeneration,
+    saveVideo,
+    addChatMessage,
+    saveCurrentConversation,
+    remixReference,
+  } = useAppStore();
 
   const generateVideo = useCallback(async () => {
     if (!apiKey) {
@@ -25,6 +37,33 @@ export function useVideoGeneration() {
 
     const prompts = userMessages;
 
+    // Generate a short title for the video using GPT-5
+    let videoTitle = 'Untitled Video';
+    try {
+      const titleResponse = await apiCall(
+        '/api/videos/title',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: prompts }),
+        },
+        apiKey
+      );
+
+      const titleData = await titleResponse.json();
+
+      if (titleResponse.ok && titleData.title) {
+        videoTitle = titleData.title;
+      } else {
+        const fallbackTokens = prompts.trim().split(/\s+/).slice(0, 6).join(' ');
+        videoTitle = fallbackTokens || 'Untitled Video';
+      }
+    } catch (error) {
+      console.warn('Failed to generate video title, using fallback.', error);
+      const fallbackTokens = prompts.trim().split(/\s+/).slice(0, 6).join(' ');
+      videoTitle = fallbackTokens || 'Untitled Video';
+    }
+
     try {
       resetVideoGeneration();
       updateVideoGeneration({ status: 'queued', progress: 0 });
@@ -32,12 +71,20 @@ export function useVideoGeneration() {
       // Add info message to indicate video generation has started
       addChatMessage({
         role: 'info',
-        content: 'Video generation started',
+        content: remixReference
+          ? `Remixing "${remixReference.title}" into "${videoTitle}".`
+          : `Creating "${videoTitle}".`,
+        metadata: {
+          type: 'generation',
+          status: 'started',
+          title: videoTitle,
+          isRemix: Boolean(remixReference),
+        },
       });
 
       // Crop base image if provided
       let croppedImageBase64: string | null = null;
-      if (baseImage?.previewUrl) {
+      if (!remixReference && baseImage?.previewUrl) {
         try {
           croppedImageBase64 = await cropImageFromCenter(baseImage.previewUrl);
         } catch (error) {
@@ -46,19 +93,28 @@ export function useVideoGeneration() {
         }
       }
 
-      // Create video
+      // Create or remix video
+      const requestBody: Record<string, any> = {
+        prompt: prompts,
+        model: selectedModel,
+        size: videoConfig.size,
+        seconds: videoConfig.seconds,
+      };
+
+      if (!remixReference) {
+        requestBody.inputImageBase64 = croppedImageBase64;
+      }
+
+      const endpoint = remixReference
+        ? `/api/videos/remix/${remixReference.videoId}`
+        : '/api/videos/create';
+
       const createResponse = await apiCall(
-        '/api/videos/create',
+        endpoint,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: prompts,
-            inputImageBase64: croppedImageBase64,
-            model: selectedModel,
-            size: videoConfig.size,
-            seconds: videoConfig.seconds,
-          }),
+          body: JSON.stringify(requestBody),
         },
         apiKey
       );
@@ -105,13 +161,21 @@ export function useVideoGeneration() {
             // Add info message to chat first
             addChatMessage({
               role: 'info',
-              content: new Date().toLocaleString(),
+              content: remixReference
+                ? `Remix "${videoTitle}" ready. Generated at ${new Date().toLocaleString()}.`
+                : `Video "${videoTitle}" ready. Generated at ${new Date().toLocaleString()}.`,
               videoId: videoId,
+              metadata: {
+                type: 'generation',
+                status: 'completed',
+                title: videoTitle,
+                isRemix: Boolean(remixReference),
+              },
             });
             // Save conversation with the info message to ensure we have a conversationId
             saveCurrentConversation();
             // Save video to history (will be linked to current conversation)
-            saveVideo(videoId, prompts);
+            saveVideo(videoId, prompts, videoTitle, remixReference?.videoId || null);
           } else if (statusData.status === 'failed') {
             clearInterval(pollInterval);
             updateVideoGeneration({
@@ -133,7 +197,19 @@ export function useVideoGeneration() {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
-  }, [apiKey, chatMessages, selectedModel, baseImage, videoConfig, updateVideoGeneration, resetVideoGeneration, saveVideo, addChatMessage, saveCurrentConversation]);
+  }, [
+    apiKey,
+    chatMessages,
+    selectedModel,
+    baseImage,
+    videoConfig,
+    updateVideoGeneration,
+    resetVideoGeneration,
+    saveVideo,
+    addChatMessage,
+    saveCurrentConversation,
+    remixReference,
+  ]);
 
   return { generateVideo };
 }

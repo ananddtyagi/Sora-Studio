@@ -9,7 +9,7 @@ import { ImageModal } from '../ui/ImageModal';
 import { apiCall } from '@/lib/api';
 
 export const ChatPanel: React.FC = () => {
-  const { apiKey, chatMessages, addChatMessage, setReadyToGenerate, saveCurrentConversation, baseImage, setBaseImage } = useAppStore();
+  const { apiKey, chatMessages, addChatMessage, setReadyToGenerate, saveCurrentConversation, baseImage, setBaseImage, remixReference, savedVideos, savedConversations } = useAppStore();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -52,13 +52,40 @@ export const ChatPanel: React.FC = () => {
           ...(baseImage && { imageUrl: baseImage.previewUrl }),
         });
 
+      // Build remix context if we're remixing a video
+      let remixContext = null;
+      if (remixReference) {
+        const { videoId, title } = remixReference;
+
+        // Find the saved video to get its conversation ID
+        const savedVideo = savedVideos.find(v => v.videoId === videoId);
+        let previousChat = null;
+
+        if (savedVideo?.conversationId) {
+          // Find the conversation
+          const conversation = savedConversations.find(c => c.id === savedVideo.conversationId);
+          if (conversation) {
+            // Format the previous chat messages (exclude info messages)
+            previousChat = conversation.messages
+              .filter(msg => msg.role !== 'info')
+              .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+              .join('\n');
+          }
+        }
+
+        remixContext = {
+          videoTitle: title,
+          previousChat,
+        };
+      }
+
       // Call GPT-5 API
       const response = await apiCall(
         '/api/chat',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: apiMessages }),
+          body: JSON.stringify({ messages: apiMessages, remixContext }),
         },
         apiKey
       );

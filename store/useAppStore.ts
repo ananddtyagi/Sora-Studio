@@ -1,11 +1,21 @@
 import { create } from 'zustand';
 
+export type InfoMessageType = 'generation' | 'remix_reference';
+
+export interface InfoMessageMetadata {
+  type: InfoMessageType;
+  status?: 'started' | 'completed';
+  title?: string;
+  isRemix?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'info';
   content: string;
   timestamp: number;
   videoId?: string | null;
+  metadata?: InfoMessageMetadata;
 }
 
 export interface VideoGeneration {
@@ -30,8 +40,10 @@ export interface SavedVideo {
   videoId: string;
   conversationId: string;
   prompt: string;
+  title: string;
   createdAt: number;
   model: string;
+  remixedFromVideoId?: string | null;
 }
 
 export interface VideoConfig {
@@ -70,6 +82,9 @@ interface AppState {
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
   readyToGenerate: boolean;
   setReadyToGenerate: (ready: boolean) => void;
+  remixReference: { videoId: string; title: string } | null;
+  referenceVideoForRemix: (videoId: string, title: string) => void;
+  clearRemixReference: () => void;
 
   // Video Generation
   videoGeneration: VideoGeneration;
@@ -83,7 +98,7 @@ interface AppState {
   saveCurrentConversation: () => void;
   loadConversation: (id: string) => void;
   deleteConversation: (id: string) => void;
-  saveVideo: (videoId: string, prompt: string) => void;
+  saveVideo: (videoId: string, prompt: string, title: string, remixedFromVideoId?: string | null) => void;
   newConversation: () => void;
 }
 
@@ -155,6 +170,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
   readyToGenerate: false,
   setReadyToGenerate: (ready) => set({ readyToGenerate: ready }),
+  remixReference: null,
+  referenceVideoForRemix: (videoId, title) => {
+    const state = get();
+    if (state.remixReference?.videoId === videoId) {
+      return;
+    }
+
+    state.addChatMessage({
+      role: 'info',
+      content: `Using "${title}" as the remix source. Describe the changes you'd like and hit Generate Video when you're ready.`,
+      videoId,
+      metadata: {
+        type: 'remix_reference',
+        title,
+      },
+    });
+
+    set({ remixReference: { videoId, title } });
+  },
+  clearRemixReference: () => set({ remixReference: null }),
 
   // Video Generation
   videoGeneration: {
@@ -225,6 +260,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentConversationId: id,
         showHistory: false,
         baseImage: conversation.baseImageUrl ? { previewUrl: conversation.baseImageUrl } : null,
+        remixReference: null,
       });
     }
   },
@@ -244,18 +280,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  saveVideo: (videoId, prompt) => {
+  saveVideo: (videoId, prompt, title, remixedFromVideoId = null) => {
     const state = get();
     const video: SavedVideo = {
       id: `vid-${Date.now()}`,
       videoId,
       conversationId: state.currentConversationId || `conv-${Date.now()}`,
       prompt,
+      title,
       createdAt: Date.now(),
       model: state.selectedModel,
+      remixedFromVideoId,
     };
 
-    const updatedVideos = [video, ...state.savedVideos];
+    const existingVideos = state.savedVideos.filter((v) => v.videoId !== videoId);
+    const updatedVideos = [video, ...existingVideos];
     localStorage.setItem('saved_videos', JSON.stringify(updatedVideos));
 
     set({ savedVideos: updatedVideos });
@@ -278,6 +317,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentConversationId: null,
       readyToGenerate: false,
       baseImage: null,
+      remixReference: null,
     });
   },
 }));
@@ -315,7 +355,12 @@ if (typeof window !== 'undefined') {
   const storedVideos = localStorage.getItem('saved_videos');
   if (storedVideos) {
     try {
-      useAppStore.setState({ savedVideos: JSON.parse(storedVideos) });
+      const parsed = JSON.parse(storedVideos).map((video: any) => ({
+        ...video,
+        title: video.title || video.prompt || 'Untitled Video',
+        remixedFromVideoId: 'remixedFromVideoId' in video ? video.remixedFromVideoId : null,
+      }));
+      useAppStore.setState({ savedVideos: parsed });
     } catch (e) {
       console.error('Failed to parse saved videos');
     }
