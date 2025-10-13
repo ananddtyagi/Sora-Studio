@@ -1,12 +1,23 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import { BaseImageResolutionModal } from './BaseImageResolutionModal';
+import { SoraModel } from '@/lib/videoOptions';
 
 interface ImageUploadProps {
-  onImageSelected: (file: File, previewUrl: string) => void;
+  onImageSelected: (
+    file: File,
+    previewUrl: string,
+    selectedResolution: string,
+    cropX: number,
+    cropY: number
+  ) => void;
   onRemove?: () => void;
   previewUrl?: string | null;
   disabled?: boolean;
+  selectedModel: SoraModel;
+  currentResolution: string;
+  onSelectModel: (model: SoraModel) => void;
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -14,11 +25,19 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   onRemove,
   previewUrl,
   disabled = false,
+  selectedModel,
+  currentResolution,
+  onSelectModel,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
 
   const handleFileSelect = (file: File) => {
+    if (disabled) return;
+
     if (!file.type.startsWith('image/')) {
       alert('Please select an image file');
       return;
@@ -28,7 +47,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const url = e.target?.result as string;
-      onImageSelected(file, url);
+      setPendingFile(file);
+      setPendingPreview(url);
+      setShowModal(true);
+    };
+    reader.onerror = () => {
+      alert('Unable to read the selected file. Please try again.');
+      fileInputRef.current && (fileInputRef.current.value = '');
     };
     reader.readAsDataURL(file);
   };
@@ -46,20 +71,44 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (disabled) return;
     setIsDragging(true);
   };
 
   const handleDragLeave = () => {
+    if (disabled) return;
     setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    if (disabled) return;
     setIsDragging(false);
 
     const file = e.dataTransfer.files[0];
     if (file) {
       handleFileSelect(file);
+    }
+  };
+
+  const handleModalCancel = () => {
+    setShowModal(false);
+    setPendingFile(null);
+    setPendingPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleModalConfirm = (selectedResolution: string, cropX: number, cropY: number) => {
+    if (pendingFile && pendingPreview) {
+      onImageSelected(pendingFile, pendingPreview, selectedResolution, cropX, cropY);
+    }
+    setShowModal(false);
+    setPendingFile(null);
+    setPendingPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -125,6 +174,17 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         </svg>
         <span>Add Base Image</span>
       </button>
+
+      <BaseImageResolutionModal
+        isOpen={showModal}
+        imageUrl={pendingPreview}
+        fileName={pendingFile?.name}
+        selectedModel={selectedModel}
+        currentSize={currentResolution}
+        onSelectModel={onSelectModel}
+        onCancel={handleModalCancel}
+        onConfirm={handleModalConfirm}
+      />
     </div>
   );
 };

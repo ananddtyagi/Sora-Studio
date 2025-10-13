@@ -7,9 +7,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  contentClassName?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, contentClassName }) => {
   if (!isOpen) return null;
 
   return (
@@ -21,7 +22,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+      <div className={`relative bg-white rounded-lg shadow-xl w-full mx-4 p-6 ${contentClassName || 'max-w-md'}`}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
           <button

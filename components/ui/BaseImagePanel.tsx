@@ -1,12 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { ImageUpload } from './ImageUpload';
 import { getImageDimensions } from '@/lib/imageCrop';
+import { getSizeOptionByValue } from '@/lib/videoOptions';
 
 export const BaseImagePanel: React.FC = () => {
-  const { baseImage, setBaseImage, updateBaseImageCrop, chatMessages } = useAppStore();
+  const {
+    baseImage,
+    setBaseImage,
+    updateBaseImageCrop,
+    chatMessages,
+    selectedModel,
+    videoConfig,
+    setVideoConfig,
+    setSelectedModel,
+  } = useAppStore();
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Check if a video has been generated in this conversation
@@ -14,6 +24,13 @@ export const BaseImagePanel: React.FC = () => {
 
   const cropX = baseImage?.cropX ?? 0.5;
   const cropY = baseImage?.cropY ?? 0.5;
+
+  const selectedSizeOption = useMemo(() => getSizeOptionByValue(videoConfig.size), [videoConfig.size]);
+
+  const [targetWidth, targetHeight] = useMemo(() => {
+    const [width, height] = videoConfig.size.split('x').map(Number);
+    return [width || 1280, height || 720];
+  }, [videoConfig.size]);
 
   useEffect(() => {
     if (baseImage?.previewUrl) {
@@ -25,12 +42,21 @@ export const BaseImagePanel: React.FC = () => {
     }
   }, [baseImage]);
 
-  const handleImageSelected = (file: File, previewUrl: string) => {
+  const handleImageSelected = (
+    file: File,
+    previewUrl: string,
+    selectedResolution: string,
+    cropX: number,
+    cropY: number
+  ) => {
     if (hasGeneratedVideo && baseImage) {
       alert('Cannot change base image after generating a video. Please start a new chat to use a different image.');
       return;
     }
-    setBaseImage({ file, previewUrl, cropX: 0.5, cropY: 0.5 });
+    if (videoConfig.size !== selectedResolution) {
+      setVideoConfig({ size: selectedResolution });
+    }
+    setBaseImage({ file, previewUrl, cropX: Number.isFinite(cropX) ? cropX : 0.5, cropY: Number.isFinite(cropY) ? cropY : 0.5 });
   };
 
   const handleCropChange = (axis: 'x' | 'y', value: number) => {
@@ -54,7 +80,7 @@ export const BaseImagePanel: React.FC = () => {
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-gray-900 mb-1">Base Image</h3>
         <p className="text-xs text-gray-500">
-          Will be cropped from center to fit 1280x720
+          Will be center-cropped to fit {selectedSizeOption?.label || `${targetWidth}x${targetHeight}`}
         </p>
       </div>
 
@@ -64,6 +90,9 @@ export const BaseImagePanel: React.FC = () => {
           onRemove={baseImage ? handleRemoveImage : undefined}
           previewUrl={baseImage?.previewUrl || null}
           disabled={hasGeneratedVideo && !!baseImage}
+          selectedModel={selectedModel}
+          currentResolution={videoConfig.size}
+          onSelectModel={setSelectedModel}
         />
 
         {hasGeneratedVideo && baseImage && (
@@ -82,7 +111,7 @@ export const BaseImagePanel: React.FC = () => {
               </div>
               <div className="flex justify-between mt-1">
                 <span>Target:</span>
-                <span className="font-mono">1280 × 720</span>
+                <span className="font-mono">{targetWidth} × {targetHeight}</span>
               </div>
             </div>
 

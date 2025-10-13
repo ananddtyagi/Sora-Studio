@@ -7,9 +7,25 @@ import { Button } from '../ui/Button';
 import { ImageUpload } from '../ui/ImageUpload';
 import { ImageModal } from '../ui/ImageModal';
 import { apiCall } from '@/lib/api';
+import { getSizeOptionByValue } from '@/lib/videoOptions';
 
 export const ChatPanel: React.FC = () => {
-  const { apiKey, chatMessages, addChatMessage, setReadyToGenerate, saveCurrentConversation, baseImage, setBaseImage, remixReference, savedVideos, savedConversations } = useAppStore();
+  const {
+    apiKey,
+    chatMessages,
+    addChatMessage,
+    setReadyToGenerate,
+    saveCurrentConversation,
+    baseImage,
+    setBaseImage,
+    remixReference,
+    savedVideos,
+    savedConversations,
+    videoConfig,
+    setVideoConfig,
+    selectedModel,
+    setSelectedModel,
+  } = useAppStore();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -126,12 +142,26 @@ export const ChatPanel: React.FC = () => {
     }
   };
 
-  const handleImageSelected = (file: File, previewUrl: string) => {
+  const handleImageSelected = (
+    file: File,
+    previewUrl: string,
+    selectedResolution: string,
+    cropX: number,
+    cropY: number
+  ) => {
     if (hasGeneratedVideo && baseImage) {
       alert('Cannot change base image after generating a video. Please start a new chat to use a different image.');
       return;
     }
-    setBaseImage({ file, previewUrl });
+    if (videoConfig.size !== selectedResolution) {
+      setVideoConfig({ size: selectedResolution });
+    }
+    setBaseImage({
+      file,
+      previewUrl,
+      cropX: Number.isFinite(cropX) ? cropX : 0.5,
+      cropY: Number.isFinite(cropY) ? cropY : 0.5,
+    });
   };
 
   const handleRemoveImage = () => {
@@ -177,7 +207,9 @@ export const ChatPanel: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">Base Image</p>
-                <p className="text-xs text-gray-500">Will be cropped from center to 1280x720</p>
+                <p className="text-xs text-gray-500">
+                  Will be center-cropped to fit {getSizeOptionByValue(videoConfig.size)?.label || videoConfig.size}
+                </p>
                 {hasGeneratedVideo && (
                   <p className="text-xs text-amber-600 mt-1">🔒 Locked - Start new chat to change</p>
                 )}
@@ -201,6 +233,9 @@ export const ChatPanel: React.FC = () => {
               onImageSelected={handleImageSelected}
               previewUrl={null}
               disabled={false}
+              selectedModel={selectedModel}
+              currentResolution={videoConfig.size}
+              onSelectModel={setSelectedModel}
             />
           </div>
         )}

@@ -86,7 +86,21 @@ export function useVideoGeneration() {
       let croppedImageBase64: string | null = null;
       if (!remixReference && baseImage?.previewUrl) {
         try {
-          croppedImageBase64 = await cropImageFromCenter(baseImage.previewUrl);
+          const [configuredWidth, configuredHeight] = videoConfig.size
+            .split('x')
+            .map(Number);
+          const targetWidth = configuredWidth || 1280;
+          const targetHeight = configuredHeight || 720;
+          const cropX = baseImage.cropX ?? 0.5;
+          const cropY = baseImage.cropY ?? 0.5;
+
+          croppedImageBase64 = await cropImageFromCenter(
+            baseImage.previewUrl,
+            targetWidth,
+            targetHeight,
+            cropX,
+            cropY
+          );
         } catch (error) {
           console.error('Failed to crop image:', error);
           alert('Failed to crop base image. Continuing without it.');

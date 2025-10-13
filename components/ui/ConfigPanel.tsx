@@ -2,25 +2,20 @@
 
 import { useAppStore } from '@/store/useAppStore';
 import React, { useEffect } from 'react';
+import { getSizeOptionsForModel } from '@/lib/videoOptions';
 
 export const ConfigPanel: React.FC = () => {
   const { videoConfig, setVideoConfig, selectedModel, remixReference, clearRemixReference } = useAppStore();
 
-  const allSizeOptions = [
-    { value: '1280x720', label: '1280x720 (HD Landscape)', models: ['sora-2', 'sora-2-pro'] },
-    { value: '720x1280', label: '720x1280 (HD Portrait)', models: ['sora-2', 'sora-2-pro'] },
-    { value: '1792x1024', label: '1792x1024 (Wide Landscape)', models: ['sora-2-pro'] },
-    { value: '1024x1792', label: '1024x1792 (Tall Portrait)', models: ['sora-2-pro'] },
-  ];
-
   // Filter size options based on selected model
-  const sizeOptions = allSizeOptions.filter(option => option.models.includes(selectedModel));
+  const sizeOptions = getSizeOptionsForModel(selectedModel);
 
   // Auto-adjust size if current size is not valid for selected model
   useEffect(() => {
     const isCurrentSizeValid = sizeOptions.some(option => option.value === videoConfig.size);
     if (!isCurrentSizeValid) {
-      setVideoConfig({ size: '1280x720' }); // Default to 1280x720 if invalid
+      const fallbackSize = sizeOptions[0]?.value || '1280x720';
+      setVideoConfig({ size: fallbackSize });
     }
   }, [selectedModel, videoConfig.size, sizeOptions, setVideoConfig]);
 
@@ -85,7 +80,7 @@ export const ConfigPanel: React.FC = () => {
             {selectedModel === 'sora-2' ? (
               <>Base model supports HD resolutions. Switch to Pro for wider formats.</>
             ) : (
-              <>Pro model supports all resolution options</>
+              <>Pro model supports all resolution options.</>
             )}
           </p>
         </div>
