@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { parseOpenAIError, getStatusFromErrorCode } from '@/lib/errors';
 
 export async function GET(
   request: NextRequest,
@@ -19,17 +20,24 @@ export async function GET(
     const openai = new OpenAI({ apiKey });
     const video = await openai.videos.retrieve(id);
 
+    // If video failed, include structured error information
+    let errorInfo = null;
+    if (video.status === 'failed' && video.error) {
+      errorInfo = typeof video.error === 'string'
+        ? { code: 'generation_failed', message: video.error }
+        : video.error;
+    }
+
     return NextResponse.json({
       id: video.id,
       status: video.status,
       progress: video.progress || 0,
-      error: video.status === 'failed' ? (video.error || 'Video generation failed') : null,
+      error: errorInfo,
     });
   } catch (error: any) {
     console.error('Video status error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to get video status' },
-      { status: 500 }
-    );
+    const errorResponse = parseOpenAIError(error);
+    const statusCode = getStatusFromErrorCode(errorResponse.error.code);
+    return NextResponse.json(errorResponse, { status: statusCode });
   }
 }

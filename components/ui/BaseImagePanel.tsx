@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { ImageUpload } from './ImageUpload';
 import { getImageDimensions } from '@/lib/imageCrop';
 import { getSizeOptionByValue } from '@/lib/videoOptions';
+import { toast } from 'sonner';
 
 export const BaseImagePanel: React.FC = () => {
   const {
@@ -50,7 +51,7 @@ export const BaseImagePanel: React.FC = () => {
     cropY: number
   ) => {
     if (hasGeneratedVideo && baseImage) {
-      alert('Cannot change base image after generating a video. Please start a new chat to use a different image.');
+      toast.error('Cannot change base image after generating a video. Please start a new chat to use a different image.');
       return;
     }
     if (videoConfig.size !== selectedResolution) {
@@ -69,7 +70,7 @@ export const BaseImagePanel: React.FC = () => {
 
   const handleRemoveImage = () => {
     if (hasGeneratedVideo) {
-      alert('Cannot remove base image after generating a video. Please start a new chat.');
+      toast.error('Cannot remove base image after generating a video. Please start a new chat.');
       return;
     }
     setBaseImage(null);

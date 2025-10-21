@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { parseOpenAIError, getStatusFromErrorCode } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,9 +42,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imageBase64 });
   } catch (error: any) {
     console.error('Image generation error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to generate image' },
-      { status: 500 }
-    );
+    const errorResponse = parseOpenAIError(error);
+    const statusCode = getStatusFromErrorCode(errorResponse.error.code);
+    return NextResponse.json(errorResponse, { status: statusCode });
   }
 }

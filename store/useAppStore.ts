@@ -9,13 +9,18 @@ export interface InfoMessageMetadata {
   isRemix?: boolean;
 }
 
+export interface ErrorMetadata {
+  code?: string;
+}
+
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'info';
+  role: 'user' | 'assistant' | 'info' | 'error';
   content: string;
   timestamp: number;
   videoId?: string | null;
   metadata?: InfoMessageMetadata;
+  errorMetadata?: ErrorMetadata;
 }
 
 export interface VideoGeneration {
@@ -24,6 +29,7 @@ export interface VideoGeneration {
   progress: number;
   videoUrl: string | null;
   error: string | null;
+  errorCode?: string | null;
 }
 
 export interface SavedConversation {

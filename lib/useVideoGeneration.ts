@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { apiCall } from './api';
 import { cropImageFromCenter } from './imageCrop';
+import { toast } from 'sonner';
 
 export function useVideoGeneration() {
   const {
@@ -20,7 +21,7 @@ export function useVideoGeneration() {
 
   const generateVideo = useCallback(async () => {
     if (!apiKey) {
-      alert('Please set your OpenAI API key in settings');
+      toast.error('Please set your OpenAI API key in settings');
       return;
     }
 
@@ -31,7 +32,7 @@ export function useVideoGeneration() {
       .join(' ');
 
     if (!userMessages.trim()) {
-      alert('Please describe your video idea in the chat');
+      toast.error('Please describe your video idea in the chat');
       return;
     }
 
@@ -103,7 +104,7 @@ export function useVideoGeneration() {
           );
         } catch (error) {
           console.error('Failed to crop image:', error);
-          alert('Failed to crop base image. Continuing without it.');
+          toast.warning('Failed to crop base image. Continuing without it.');
         }
       }
 
@@ -136,7 +137,20 @@ export function useVideoGeneration() {
       const createData = await createResponse.json();
 
       if (!createResponse.ok) {
-        throw new Error(createData.error || 'Failed to create video');
+        const errorMessage = createData.error?.message || createData.error || 'Failed to create video';
+        const errorCode = createData.error?.code || 'video_creation_failed';
+
+        // Show toast notification
+        toast.error(errorMessage);
+
+        // Add error message to chat
+        addChatMessage({
+          role: 'error',
+          content: errorMessage,
+          errorMetadata: { code: errorCode },
+        });
+
+        throw new Error(JSON.stringify({ message: errorMessage, code: errorCode }));
       }
 
       const videoId = createData.id;
@@ -192,23 +206,76 @@ export function useVideoGeneration() {
             saveVideo(videoId, prompts, videoTitle, remixReference?.videoId || null);
           } else if (statusData.status === 'failed') {
             clearInterval(pollInterval);
+
+            // Parse error information
+            const errorMessage = statusData.error?.message || statusData.error || 'Video generation failed';
+            const errorCode = statusData.error?.code || 'generation_failed';
+
+            // Show toast notification
+            toast.error(errorMessage);
+
+            // Add error message to chat
+            addChatMessage({
+              role: 'error',
+              content: errorMessage,
+              errorMetadata: { code: errorCode },
+            });
+
             updateVideoGeneration({
-              error: statusData.error || 'Video generation failed',
+              error: errorMessage,
+              errorCode: errorCode,
             });
           }
         } catch (error) {
           clearInterval(pollInterval);
+
+          // Parse error information
+          let errorMessage = 'Failed to check video status';
+          let errorCode = 'status_check_failed';
+
+          try {
+            const errorData = JSON.parse((error as Error).message);
+            errorMessage = errorData.message || errorMessage;
+            errorCode = errorData.code || errorCode;
+          } catch {
+            errorMessage = (error as Error).message || errorMessage;
+          }
+
+          // Show toast notification
+          toast.error(errorMessage);
+
+          // Add error message to chat
+          addChatMessage({
+            role: 'error',
+            content: errorMessage,
+            errorMetadata: { code: errorCode },
+          });
+
           updateVideoGeneration({
             status: 'failed',
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: errorMessage,
+            errorCode: errorCode,
           });
         }
       }, 5000); // Poll every 5 seconds
 
     } catch (error) {
+      // Parse error information (may already be handled in createVideo error)
+      let errorMessage = 'Unknown error occurred';
+      let errorCode = 'unknown_error';
+
+      try {
+        const errorData = JSON.parse((error as Error).message);
+        errorMessage = errorData.message || errorMessage;
+        errorCode = errorData.code || errorCode;
+      } catch {
+        errorMessage = (error as Error).message || errorMessage;
+      }
+
       updateVideoGeneration({
         status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorMessage,
+        errorCode: errorCode,
       });
     }
   }, [

@@ -11,6 +11,7 @@ import { useVideoGeneration } from '@/lib/useVideoGeneration';
 import { useAppStore } from '@/store/useAppStore';
 import { Check, DownloadCloud } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 // Video History Content Component
 function VideoHistoryContent() {
@@ -343,14 +344,14 @@ export default function Home() {
 
     // Quick prechecks to avoid locking when we know we won't start
     if (!apiKey) {
-      alert('Please set your OpenAI API key in settings');
+      toast.error('Please set your OpenAI API key in settings');
       return;
     }
     const hasUserPrompt = chatMessages.some(
       (m) => m.role === 'user' && m.content.trim().length > 0
     );
     if (!hasUserPrompt) {
-      alert('Please describe your video idea in the chat');
+      toast.error('Please describe your video idea in the chat');
       return;
     }
 

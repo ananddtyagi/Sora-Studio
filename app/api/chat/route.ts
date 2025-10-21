@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { parseOpenAIError, getStatusFromErrorCode } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,9 +83,8 @@ IMPORTANT: If the user indicates they're happy with the remix idea and ready to 
     return NextResponse.json({ message: finalMessage, readyToGenerate });
   } catch (error: any) {
     console.error('Chat error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to generate response' },
-      { status: 500 }
-    );
+    const errorResponse = parseOpenAIError(error);
+    const statusCode = getStatusFromErrorCode(errorResponse.error.code);
+    return NextResponse.json(errorResponse, { status: statusCode });
   }
 }

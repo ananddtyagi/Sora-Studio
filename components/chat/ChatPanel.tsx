@@ -8,6 +8,7 @@ import { ImageUpload } from '../ui/ImageUpload';
 import { ImageModal } from '../ui/ImageModal';
 import { apiCall } from '@/lib/api';
 import { getSizeOptionByValue } from '@/lib/videoOptions';
+import { toast } from 'sonner';
 
 export const ChatPanel: React.FC = () => {
   const {
@@ -109,7 +110,9 @@ export const ChatPanel: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response');
+        const errorMessage = data.error?.message || data.error || 'Failed to get response';
+        const errorCode = data.error?.code;
+        throw new Error(JSON.stringify({ message: errorMessage, code: errorCode }));
       }
 
       addChatMessage({
@@ -126,9 +129,27 @@ export const ChatPanel: React.FC = () => {
       setTimeout(() => saveCurrentConversation(), 500);
     } catch (error) {
       console.error('Chat error:', error);
+
+      // Parse error information
+      let errorMessage = 'Sorry, I encountered an error. Please make sure your API key is valid and try again.';
+      let errorCode = 'unknown_error';
+
+      try {
+        const errorData = JSON.parse((error as Error).message);
+        errorMessage = errorData.message || errorMessage;
+        errorCode = errorData.code || errorCode;
+      } catch {
+        errorMessage = (error as Error).message || errorMessage;
+      }
+
+      // Show toast notification
+      toast.error(errorMessage);
+
+      // Add error message to chat
       addChatMessage({
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please make sure your API key is valid and try again.',
+        role: 'error',
+        content: errorMessage,
+        errorMetadata: { code: errorCode },
       });
     } finally {
       setIsLoading(false);
@@ -150,7 +171,7 @@ export const ChatPanel: React.FC = () => {
     cropY: number
   ) => {
     if (hasGeneratedVideo && baseImage) {
-      alert('Cannot change base image after generating a video. Please start a new chat to use a different image.');
+      toast.error('Cannot change base image after generating a video. Please start a new chat to use a different image.');
       return;
     }
     if (videoConfig.size !== selectedResolution) {
@@ -166,7 +187,7 @@ export const ChatPanel: React.FC = () => {
 
   const handleRemoveImage = () => {
     if (hasGeneratedVideo) {
-      alert('Cannot remove base image after generating a video. Please start a new chat.');
+      toast.error('Cannot remove base image after generating a video. Please start a new chat.');
       return;
     }
     setBaseImage(null);
