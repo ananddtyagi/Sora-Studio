@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { BaseImageResolutionModal } from './BaseImageResolutionModal';
 import { SoraModel } from '@/lib/videoOptions';
+import { toast } from 'sonner';
 
 interface ImageUploadProps {
   onImageSelected: (
@@ -39,7 +40,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     if (disabled) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast.error('Please select an image file');
       return;
     }
 
@@ -52,7 +53,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       setShowModal(true);
     };
     reader.onerror = () => {
-      alert('Unable to read the selected file. Please try again.');
+      toast.error('Unable to read the selected file. Please try again.');
       fileInputRef.current && (fileInputRef.current.value = '');
     };
     reader.readAsDataURL(file);

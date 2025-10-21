@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { Button } from '../ui/Button';
+import { toast } from 'sonner';
 
 export const VideoPlayer: React.FC = () => {
   const { videoGeneration, apiKey } = useAppStore();
@@ -32,7 +33,7 @@ export const VideoPlayer: React.FC = () => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download video');
+      toast.error('Failed to download video');
     }
   };
 

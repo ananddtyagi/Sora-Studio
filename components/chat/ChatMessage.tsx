@@ -3,6 +3,7 @@
 import React from 'react';
 import { ChatMessage as ChatMessageType } from '@/store/useAppStore';
 import { useAppStore } from '@/store/useAppStore';
+import { toast } from 'sonner';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -12,6 +13,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const { apiKey } = useAppStore();
   const isAssistant = message.role === 'assistant';
   const isInfo = message.role === 'info';
+  const isError = message.role === 'error';
 
   const handleDownload = async (videoId: string) => {
     try {
@@ -27,7 +29,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download video');
+      toast.error('Failed to download video');
     }
   };
 
@@ -104,6 +106,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               Download
             </button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Render error messages
+  if (isError) {
+    return (
+      <div className="flex justify-center mb-4">
+        <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg shadow-sm max-w-[90%]">
+          <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-900">Error</p>
+            {message.errorMetadata?.code && (
+              <p className="text-xs text-gray-600 font-mono">{message.errorMetadata.code}</p>
+            )}
+            <p className="text-xs text-gray-700 mt-1">{message.content}</p>
+          </div>
         </div>
       </div>
     );
